@@ -1,0 +1,114 @@
+spring:
+  application:
+    name: inventory-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/inventory_service
+    username: postgres
+    password: 12345678
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  kafka:
+    # Kafka brokers
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093,localhost:9094}
+
+    producer:
+      client-id: inventory-service-producer
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      acks: all
+      retries: 2147483647
+      batch-size: 16384
+      buffer-memory: 33554432
+
+      properties:
+        "[enable.idempotence]": true
+        "[max.in.flight.requests.per.connection]": 5
+        "[retry.backoff.ms]": 1000
+        "[retry.backoff.max.ms]": 5000
+        "[request.timeout.ms]": 30000
+        "[delivery.timeout.ms]": 120000
+        "[linger.ms]": 5
+        "[compression.type]": zstd
+        "[spring.json.add.type.headers]": false
+
+server:
+  port: 8083
+
+springdoc:
+  api-docs:
+    path: /api-docs
+
+  swagger-ui:
+    path: /swagger-ui.html
+
+
+#spring:
+#  application:
+#    name: inventory-service
+#
+#  datasource:
+#    url: jdbc:mysql://localhost:3306/inventory_service?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh
+#    username: root
+#    password: 12345678
+#    driver-class-name: com.mysql.cj.jdbc.Driver
+#
+#  jpa:
+#    hibernate:
+#      ddl-auto: update
+#    show-sql: true
+#    properties:
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQLDialect
+#        format_sql: true
+#
+#  kafka:
+#    bootstrap-servers: localhost:9092
+#
+#    producer:
+#      client-id: inventory-service-producer
+#
+#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+#      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+#
+#      acks: all
+#      retries: 2147483647
+#
+#      batch-size: 16384
+#      buffer-memory: 33554432
+#
+#      properties:
+#        "[enable.idempotence]": true
+#        "[max.in.flight.requests.per.connection]": 5
+#        "[retry.backoff.ms]": 1000
+#        "[retry.backoff.max.ms]": 5000
+#        "[request.timeout.ms]": 30000
+#        "[delivery.timeout.ms]": 120000
+#        "[linger.ms]": 5
+#        "[compression.type]": zstd
+#        "[spring.json.add.type.headers]": false
+#
+#logging:
+#  level:
+#    org.hibernate.SQL: DEBUG
+#    org.hibernate.tool.schema: DEBUG
+#
+#server:
+#  port: 8083
+#
+#springdoc:
+#  api-docs:
+#    path: /api-docs
+#
+#  swagger-ui:
+#    path: /swagger-ui.html

@@ -1,0 +1,362 @@
+
+# ============================================================
+# E-COMMERCE - KAFKA + ZOOKEEPER HIGH AVAILABILITY
+#
+# Architecture:
+#   - 3 ZooKeeper nodes: chịu lỗi 1 ZooKeeper node
+#   - 3 Kafka brokers: replication và broker failover
+#   - Replication factor = 3
+#   - Minimum in-sync replicas = 2
+
+services:
+
+  # ==========================================================
+  # 1. ZOOKEEPER ENSEMBLE
+  # ==========================================================
+
+  zookeeper-1:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper-1
+    container_name: ecommerce-zookeeper-1
+    restart: unless-stopped
+
+    # Không mở port ZooKeeper ra máy host.
+    # Kafka kết nối nội bộ thông qua Docker network.
+    expose:
+      - "2181"
+      - "2888"
+      - "3888"
+
+    environment:
+      # ID phải duy nhất trong ZooKeeper ensemble.
+      ZOOKEEPER_SERVER_ID: 1
+
+      # Port cho Kafka và các client kết nối vào ZooKeeper.
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+      # Thời gian cơ sở cho heartbeat và timeout.
+      ZOOKEEPER_TICK_TIME: 2000
+
+      # Thời gian khởi tạo kết nối và đồng bộ giữa các node.
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+
+      # Danh sách peer dùng chung cho cả 3 ZooKeeper node.
+      # 2888: giao tiếp giữa các node.
+      # 3888: bầu leader của ZooKeeper.
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+
+    # Lưu dữ liệu riêng để không bị mất khi recreate container.
+    volumes:
+      - zookeeper-1-data:/var/lib/zookeeper/data
+      - zookeeper-1-log:/var/lib/zookeeper/log
+
+    networks:
+      - kafka-network
+
+    # Kiểm tra ZooKeeper đã sẵn sàng nhận kết nối.
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  zookeeper-2:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper-2
+    container_name: ecommerce-zookeeper-2
+    restart: unless-stopped
+
+    expose:
+      - "2181"
+      - "2888"
+      - "3888"
+
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+
+    volumes:
+      - zookeeper-2-data:/var/lib/zookeeper/data
+      - zookeeper-2-log:/var/lib/zookeeper/log
+
+    networks:
+      - kafka-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  zookeeper-3:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper-3
+    container_name: ecommerce-zookeeper-3
+    restart: unless-stopped
+
+    expose:
+      - "2181"
+      - "2888"
+      - "3888"
+
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+
+      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+
+    volumes:
+      - zookeeper-3-data:/var/lib/zookeeper/data
+      - zookeeper-3-log:/var/lib/zookeeper/log
+
+    networks:
+      - kafka-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 10"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ==========================================================
+  # 2. KAFKA BROKER 1
+  # ==========================================================
+
+  kafka-1:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-1
+    container_name: ecommerce-kafka-1
+    restart: unless-stopped
+
+    # Host 9092 -> port EXTERNAL của broker 1.
+    # Chỉ bind localhost để không công khai port ra mạng LAN.
+    ports:
+      - "127.0.0.1:9092:9092"
+
+    depends_on:
+      zookeeper-1:
+        condition: service_healthy
+      zookeeper-2:
+        condition: service_healthy
+      zookeeper-3:
+        condition: service_healthy
+
+    environment:
+      KAFKA_BROKER_ID: 1
+
+      # Kafka kết nối tới cả 3 ZooKeeper node.
+      # Nếu một node mất kết nối, Kafka có các địa chỉ còn lại.
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+
+      # INTERNAL: dành cho microservices trong Docker.
+      # EXTERNAL: dành cho ứng dụng chạy từ IntelliJ/Windows.
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092"
+
+      # Client sẽ nhận đúng địa chỉ theo listener đã kết nối.
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # Replication cho dữ liệu và các Kafka internal topics.
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      # Hạn chế bầu leader từ replica không đồng bộ.
+      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"
+
+      # Không tự tạo topic khi client nhập sai tên.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # Mặc định 3 partition cho topic mới.
+      KAFKA_NUM_PARTITIONS: 3
+
+      # Giữ message tối đa 7 ngày theo cấu hình broker mặc định.
+      KAFKA_LOG_RETENTION_HOURS: 168
+
+      # Kiểm tra log hết hạn mỗi 5 phút.
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+
+      # Giảm thời gian chờ của consumer group lúc khởi tạo.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    volumes:
+      - kafka-1-data:/var/lib/kafka/data
+
+    networks:
+      - kafka-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 20"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ==========================================================
+  # 3. KAFKA BROKER 2
+  # ==========================================================
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-2
+    container_name: ecommerce-kafka-2
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:9093:9092"
+
+    depends_on:
+      zookeeper-1:
+        condition: service_healthy
+      zookeeper-2:
+        condition: service_healthy
+      zookeeper-3:
+        condition: service_healthy
+
+    environment:
+      KAFKA_BROKER_ID: 2
+
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092"
+
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-2:29092,EXTERNAL://localhost:9093"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    volumes:
+      - kafka-2-data:/var/lib/kafka/data
+
+    networks:
+      - kafka-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 20"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # ==========================================================
+  # 4. KAFKA BROKER 3
+  # ==========================================================
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka-3
+    container_name: ecommerce-kafka-3
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:9094:9092"
+
+    depends_on:
+      zookeeper-1:
+        condition: service_healthy
+      zookeeper-2:
+        condition: service_healthy
+      zookeeper-3:
+        condition: service_healthy
+
+    environment:
+      KAFKA_BROKER_ID: 3
+
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
+
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092"
+
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka-3:29092,EXTERNAL://localhost:9094"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+
+      KAFKA_UNCLEAN_LEADER_ELECTION_ENABLE: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+    volumes:
+      - kafka-3-data:/var/lib/kafka/data
+
+    networks:
+      - kafka-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 20"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+# ============================================================
+# 5. PERSISTENT VOLUMES
+#
+# Mỗi node có volume riêng.
+# Container bị recreate không đồng nghĩa dữ liệu bị xóa.
+# Tránh docker compose down -v nếu muốn giữ dữ liệu.
+# ============================================================
+
+volumes:
+  zookeeper-1-data:
+  zookeeper-1-log:
+  zookeeper-2-data:
+  zookeeper-2-log:
+  zookeeper-3-data:
+  zookeeper-3-log:
+
+  kafka-1-data:
+  kafka-2-data:
+  kafka-3-data:
+
+# ============================================================
+# 6. SHARED NETWORK
+#
+# Các microservice chạy ở Compose file khác có thể tham gia
+# network ecommerce-kafka-network để kết nối tới Kafka.
+# ============================================================
+
+networks:
+  kafka-network:
+    name: ecommerce-kafka-network
+    driver: bridge
