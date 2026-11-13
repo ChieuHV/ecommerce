@@ -1,5 +1,6 @@
 package com.ecommerce.cart.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -33,7 +34,11 @@ public class CartItemResponse {
 
     private Integer quantity;
 
+    private BigDecimal subtotal;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
 }

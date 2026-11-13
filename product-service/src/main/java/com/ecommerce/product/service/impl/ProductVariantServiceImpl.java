@@ -131,6 +131,14 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                 .toList();
     }
 
+    @Override
+    public ProductVariantClientResponse getById(String variantId) {
+        ProductVariant productVariant = productVariantRepository.findByIdWithProduct(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("ProductVariant with id " + variantId + " not found"));
+
+        return productVariantMapper.toClientResponse(productVariant);
+    }
+
     private OutboxEvent buildOutboxEvent(ProductVariant variant, Integer quantity) {
         String eventId = UUID.randomUUID().toString();
 

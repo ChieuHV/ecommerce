@@ -1,14 +1,17 @@
 package com.ecommerce.cart.client;
 
+import com.ecommerce.cart.common.response.ApiResponse;
 import com.ecommerce.cart.dto.response.ProductVariantClientResponse;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "product-service", url = "${services.product.url}")
+@FeignClient(name = "product-service", url = "${services.product-variants.url}")
 public interface ProductVariantClient {
-    @GetMapping("/by-ids")
-    List<ProductVariantClientResponse> getVariantsByIds(@RequestParam List<String> ids);
+    @PostMapping("/by-ids")
+    ApiResponse<List<ProductVariantClientResponse>> getVariantsByIds(@RequestBody List<String> ids);
+
+    @GetMapping("/{id}")
+    ApiResponse<ProductVariantClientResponse> getVariantById(@PathVariable String id);
 }

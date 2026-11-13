@@ -22,7 +22,7 @@ server:
 
 services:
   product:
-    url: http://localhost:8082
+    url: http://localhost:8082/api/v1/product-variants
 
 springdoc:
   api-docs:

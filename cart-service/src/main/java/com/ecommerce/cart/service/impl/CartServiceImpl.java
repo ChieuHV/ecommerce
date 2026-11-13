@@ -1,6 +1,7 @@
 package com.ecommerce.cart.service.impl;
 
 import com.ecommerce.cart.client.ProductVariantClient;
+import com.ecommerce.cart.common.response.ApiResponse;
 import com.ecommerce.cart.dto.request.CartItemRequest;
 import com.ecommerce.cart.dto.response.CartItemResponse;
 import com.ecommerce.cart.dto.response.CartResponse;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -55,7 +57,13 @@ public class CartServiceImpl implements CartService {
                 .map(request -> request.getVariantId().trim())
                 .toList();
 
-        List<ProductVariantClientResponse> variants = productVariantClient.getVariantsByIds(variantIds);
+        ApiResponse<List<ProductVariantClientResponse>> apiResponse = productVariantClient.getVariantsByIds(variantIds);
+
+        if (apiResponse == null) {
+            throw new BusinessException("VARIANT_CLIENT_NOT_FOUND", "Product variant not found");
+        }
+
+        List<ProductVariantClientResponse> variants = productVariantClient.getVariantsByIds(variantIds).getData();
 
         if (variants.size() != uniqueVariantIds.size()) {
             throw new BusinessException(
@@ -132,7 +140,13 @@ public class CartServiceImpl implements CartService {
                 .distinct()
                 .toList();
 
-        List<ProductVariantClientResponse> variants = productVariantClient.getVariantsByIds(variantIds);
+        ApiResponse<List<ProductVariantClientResponse>> apiResponse = productVariantClient.getVariantsByIds(variantIds);
+
+        if (apiResponse == null) {
+            throw new BusinessException("VARIANT_CLIENT_NOT_FOUND", "Product variant not found");
+        }
+
+        List<ProductVariantClientResponse> variants = productVariantClient.getVariantsByIds(variantIds).getData();
 
         Map<String, ProductVariantClientResponse> variantMap =
                 variants.stream()
@@ -154,6 +168,8 @@ public class CartServiceImpl implements CartService {
                                 );
                             }
 
+                            BigDecimal subTotal = variant.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+
                             return CartItemResponse.builder()
                                     .id(item.getId())
                                     .variantId(item.getVariantId())
@@ -165,6 +181,7 @@ public class CartServiceImpl implements CartService {
                                     .attributes(variant.getAttributes())
                                     .price(variant.getPrice())
                                     .quantity(item.getQuantity())
+                                    .subtotal(subTotal)
                                     .createdAt(item.getCreatedAt())
                                     .updatedAt(item.getUpdatedAt())
                                     .build();
@@ -175,11 +192,16 @@ public class CartServiceImpl implements CartService {
                 .mapToInt(CartItemResponse::getQuantity)
                 .sum();
 
+        BigDecimal totalPrice = cartItemResponses.stream()
+                .map(CartItemResponse::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return CartResponse.builder()
                 .id(cart.getId())
                 .userId(cart.getUserId())
                 .items(cartItemResponses)
                 .totalQuantity(totalQuantity)
+                .totalPrice(totalPrice)
                 .createdAt(cart.getCreatedAt())
                 .updatedAt(cart.getUpdatedAt())
                 .build();

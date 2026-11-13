@@ -18,4 +18,6 @@ public interface ProductVariantService {
     void deleteByProduct(String productId);
 
     List<ProductVariantClientResponse> getByIds(List<String> variantIds);
+
+    ProductVariantClientResponse getById(String variantId);
 }

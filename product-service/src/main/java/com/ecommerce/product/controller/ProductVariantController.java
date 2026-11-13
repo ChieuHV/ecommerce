@@ -60,10 +60,17 @@ public class ProductVariantController {
         return ResponseEntity.ok(ApiResponse.success("Product variants deleted successfully", null));
     }
 
-    @GetMapping("/by-ids")
-    public ResponseEntity<ApiResponse<List<ProductVariantClientResponse>>> findByIds(@RequestParam List<String> variantIds) {
+    @PostMapping("/by-ids")
+    public ResponseEntity<ApiResponse<List<ProductVariantClientResponse>>> findByIds(@RequestBody List<String> variantIds) {
         List<ProductVariantClientResponse> variants = productVariantService.getByIds(variantIds);
 
         return ResponseEntity.ok(ApiResponse.success("Product variants retrieved successfully", variants));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<ProductVariantClientResponse>> findById(@PathVariable String id) {
+        ProductVariantClientResponse variant = productVariantService.getById(id);
+
+        return ResponseEntity.ok(ApiResponse.success("Product variant retrieved successfully", variant));
     }
 }

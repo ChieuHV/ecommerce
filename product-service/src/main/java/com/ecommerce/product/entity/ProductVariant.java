@@ -38,7 +38,7 @@ public class ProductVariant {
     private BigDecimal price;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
+    @Column(columnDefinition = "json")
     private Map<String, String> attributes;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
