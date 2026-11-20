@@ -5,6 +5,7 @@ import com.ecommerce.inventory.dto.request.ProcessEventRequest;
 import com.ecommerce.inventory.dto.response.ProcessEventResponse;
 import com.ecommerce.inventory.entity.ProcessedEvent;
 import com.ecommerce.inventory.event.ProductVariantCreatedEvent;
+import com.ecommerce.inventory.exception.BusinessException;
 import com.ecommerce.inventory.mapper.ProcessEventMapper;
 import com.ecommerce.inventory.repository.ProcessEventRepository;
 import com.ecommerce.inventory.service.InventoryService;
@@ -39,15 +40,15 @@ public class ProcessEventServiceImpl implements ProcessEventService {
         }
 
         if (event.getVariantId() == null || event.getVariantId().isBlank()) {
-            throw new IllegalArgumentException("Variant ID is required");
+            throw new BusinessException("VARIANT_ID_REQUIRED", "Variant ID is required");
         }
 
         if (event.getQuantity() == null || event.getQuantity() < 0) {
-            throw new IllegalArgumentException("Invalid initial quantity");
+            throw new BusinessException("INVALID_INITIAL_QUANTITY", "Invalid initial quantity");
         }
 
         if (event.getEventId() == null || event.getEventId().isBlank()) {
-            throw new IllegalArgumentException("Event ID is required");
+            throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
         }
 
         InventoryRequest inventoryRequest = InventoryRequest.builder()

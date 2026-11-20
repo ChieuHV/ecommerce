@@ -17,14 +17,14 @@ public interface InventoryService {
 
     List<InventoryResponse> getAll();
 
-    InventoryResponse increaseInventory(String variantId, int quantity);
+    InventoryResponse increaseInventory(InventoryRequest inventoryRequest);
 
-    InventoryResponse decreaseInventory(String variantId, int quantity);
+    InventoryResponse decreaseInventory(InventoryRequest inventoryRequest);
 
     List<InventoryResponse> reserveInventories(List<InventoryRequest> inventoryRequests);
 
-    InventoryResponse reserveInventory(String variantId, int quantity);
+    InventoryResponse reserveInventory(InventoryRequest inventoryRequest);
 
-    InventoryResponse releaseReservedInventory(String variantId, int quantity);
+    InventoryResponse releaseReservedInventory(InventoryRequest inventoryRequest);
 
 }
