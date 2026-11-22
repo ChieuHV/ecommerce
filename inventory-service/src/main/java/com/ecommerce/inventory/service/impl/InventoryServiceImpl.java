@@ -33,14 +33,21 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional
     public InventoryResponse save(InventoryRequest inventoryRequest) {
+
         Set<ConstraintViolation<InventoryRequest>> violations = validator.validate(inventoryRequest);
 
         if (!violations.isEmpty()) {
-            throw new BusinessException("INVENTORY_REQUEST_VALIDATION_FAILED", violations.toString());
+            throw new BusinessException(
+                    "INVENTORY_REQUEST_VALIDATION_FAILED",
+                    violations.toString()
+            );
         }
 
         if (inventoryRepository.existsByVariantId(inventoryRequest.getVariantId())) {
-            throw new BusinessException("INVENTORY_ALREADY_EXISTS", "Inventory already exists for variant " + inventoryRequest.getVariantId());
+            throw new BusinessException(
+                    "INVENTORY_ALREADY_EXISTS",
+                    "Inventory already exists for variant " + inventoryRequest.getVariantId()
+            );
         }
 
         Inventory inventory = inventoryMapper.toEntity(inventoryRequest);
@@ -62,12 +69,19 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         for (InventoryRequest request : inventoryRequests) {
+
             if (request.getVariantId() == null || request.getVariantId().isBlank()) {
-                throw new BusinessException("VARIANT_ID_REQUIRED", "Variant ID is required");
+                throw new BusinessException(
+                        "VARIANT_ID_REQUIRED",
+                        "Variant ID is required"
+                );
             }
 
             if (request.getQuantity() == null || request.getQuantity() < 0) {
-                throw new BusinessException("INVALID_INVENTORY_QUANTITY", "Quantity must be greater than or equal to zero");
+                throw new BusinessException(
+                        "INVALID_INVENTORY_QUANTITY",
+                        "Quantity must be greater than or equal to zero"
+                );
             }
         }
 
@@ -76,10 +90,15 @@ public class InventoryServiceImpl implements InventoryService {
                 .collect(Collectors.toSet());
 
         if (variantIds.size() != inventoryRequests.size()) {
-            throw new BusinessException("DUPLICATE_VARIANT_IDS", "Duplicate variant IDs are not allowed");
+            throw new BusinessException(
+                    "DUPLICATE_VARIANT_IDS",
+                    "Duplicate variant IDs are not allowed"
+            );
         }
 
-        List<Inventory> inventories = inventoryRepository.findAllByVariantIdIn(new ArrayList<>(variantIds));
+        List<String> sortedVariantIds = variantIds.stream().sorted().toList();
+
+        List<Inventory> inventories = inventoryRepository.findAllByVariantIdInForUpdate(sortedVariantIds);
 
         Map<String, Inventory> inventoryMap = inventories.stream()
                 .collect(Collectors.toMap(
@@ -90,14 +109,21 @@ public class InventoryServiceImpl implements InventoryService {
         List<InventoryResponse> responses = new ArrayList<>();
 
         for (InventoryRequest request : inventoryRequests) {
+
             Inventory inventory = inventoryMap.get(request.getVariantId());
 
             if (inventory == null) {
-                throw new BusinessException("INVENTORY_NOT_FOUND", "Inventory not found for variant: " + request.getVariantId());
+                throw new BusinessException(
+                        "INVENTORY_NOT_FOUND",
+                        "Inventory not found for variant: " + request.getVariantId()
+                );
             }
 
             if (request.getQuantity() < inventory.getReservedQuantity()) {
-                throw new BusinessException("QUANTITY_LESS_THAN_RESERVED", "Quantity cannot be less than reserved quantity");
+                throw new BusinessException(
+                        "QUANTITY_LESS_THAN_RESERVED",
+                        "Quantity cannot be less than reserved quantity"
+                );
             }
 
             inventory.setQuantity(request.getQuantity());
@@ -111,6 +137,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventoryResponse getById(String id) {
+
         Inventory inventory = inventoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Inventory with id " + id + " not found"
@@ -121,6 +148,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public InventoryResponse getByVariantId(String variantId) {
+
         Inventory inventory = inventoryRepository.findByVariantId(variantId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Inventory with variant id " + variantId + " not found"
@@ -131,6 +159,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public List<InventoryResponse> getAll() {
+
         return inventoryRepository.findAll()
                 .stream()
                 .map(inventoryMapper::toInventoryResponse)
@@ -139,58 +168,229 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional
-    public InventoryResponse increaseInventory(InventoryRequest inventoryRequest) {
-        if (inventoryRequest.getQuantity() <= 0) {
-            throw new BusinessException("INVALID_INVENTORY_QUANTITY", "Quantity must be greater than 0");
+    public List<InventoryResponse> reserveInventories(List<InventoryRequest> inventoryRequests) {
+
+        if (inventoryRequests == null || inventoryRequests.isEmpty()) {
+            throw new BusinessException(
+                    "INVENTORY_REQUESTS_EMPTY",
+                    "At least one inventory item is required"
+            );
         }
 
-        Inventory inventory = inventoryRepository.findByVariantId(inventoryRequest.getVariantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Inventory with variant id " + inventoryRequest.getVariantId() + " not found"
+        Set<String> variantIds = inventoryRequests.stream()
+                .map(InventoryRequest::getVariantId)
+                .collect(Collectors.toSet());
+
+        if (variantIds.size() != inventoryRequests.size()) {
+            throw new BusinessException(
+                    "DUPLICATE_VARIANT_IDS",
+                    "Duplicate variant IDs are not allowed"
+            );
+        }
+
+        List<String> sortedVariantIds = variantIds.stream().sorted().toList();
+
+        List<Inventory> inventories = inventoryRepository.findAllByVariantIdInForUpdate(sortedVariantIds);
+
+        Map<String, Inventory> inventoryMap = inventories.stream()
+                .collect(Collectors.toMap(
+                        Inventory::getVariantId,
+                        Function.identity()
                 ));
 
-        inventory.setQuantity(inventory.getQuantity() + inventoryRequest.getQuantity());
-        inventory.setUpdatedDate(LocalDateTime.now());
+        for (InventoryRequest request : inventoryRequests) {
 
-        return inventoryMapper.toInventoryResponse(inventoryRepository.save(inventory));
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            if (inventory == null) {
+                throw new ResourceNotFoundException(
+                        "Inventory with variant id "
+                                + request.getVariantId() + " not found"
+                );
+            }
+
+            int availableQuantity = inventory.getQuantity() - inventory.getReservedQuantity();
+
+            if (availableQuantity < request.getQuantity()) {
+                throw new BusinessException(
+                        "INSUFFICIENT_INVENTORY",
+                        "Insufficient available inventory for variant: "
+                                + request.getVariantId()
+                );
+            }
+        }
+
+        List<InventoryResponse> responses = new ArrayList<>();
+
+        for (InventoryRequest request : inventoryRequests) {
+
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            inventory.setReservedQuantity(
+                    inventory.getReservedQuantity() + request.getQuantity()
+            );
+
+            inventory.setUpdatedDate(LocalDateTime.now());
+
+            responses.add(inventoryMapper.toInventoryResponse(inventory));
+        }
+
+        return responses;
     }
 
     @Override
     @Transactional
-    public InventoryResponse decreaseInventory(InventoryRequest inventoryRequest) {
-        if (inventoryRequest.getQuantity() <= 0) {
-            throw new BusinessException("INVALID_INVENTORY_QUANTITY", "Quantity must be greater than 0");
+    public List<InventoryResponse> releaseReservedInventories(List<InventoryRequest> inventoryRequests) {
+
+        if (inventoryRequests == null || inventoryRequests.isEmpty()) {
+            throw new BusinessException(
+                    "INVENTORY_REQUESTS_EMPTY",
+                    "At least one inventory item is required"
+            );
         }
 
-        Inventory inventory = inventoryRepository.findByVariantId(inventoryRequest.getVariantId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Inventory with variant id " + inventoryRequest.getQuantity() + " not found"
+        Set<String> variantIds = inventoryRequests.stream()
+                .map(InventoryRequest::getVariantId)
+                .collect(Collectors.toSet());
+
+        if (variantIds.size() != inventoryRequests.size()) {
+            throw new BusinessException(
+                    "DUPLICATE_VARIANT_IDS",
+                    "Duplicate variant IDs are not allowed"
+            );
+        }
+
+        List<String> sortedVariantIds = variantIds.stream()
+                .sorted()
+                .toList();
+
+        List<Inventory> inventories =
+                inventoryRepository.findAllByVariantIdInForUpdate(sortedVariantIds);
+
+        Map<String, Inventory> inventoryMap = inventories.stream()
+                .collect(Collectors.toMap(
+                        Inventory::getVariantId,
+                        Function.identity()
                 ));
 
-        int availableQuantity = inventory.getQuantity() - inventory.getReservedQuantity();
+        for (InventoryRequest request : inventoryRequests) {
 
-        if (availableQuantity < inventoryRequest.getQuantity()) {
-            throw new BusinessException("INSUFFICIENT_INVENTORY", "Insufficient available inventory");
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            if (inventory == null) {
+                throw new ResourceNotFoundException(
+                        "Inventory with variant id "
+                                + request.getVariantId() + " not found"
+                );
+            }
+
+            if (request.getQuantity() <= 0) {
+                throw new BusinessException(
+                        "INVALID_INVENTORY_QUANTITY",
+                        "Quantity must be greater than zero"
+                );
+            }
+
+            if (inventory.getReservedQuantity() < request.getQuantity()) {
+                throw new BusinessException(
+                        "INSUFFICIENT_RESERVED_INVENTORY",
+                        "Release quantity exceeds reserved inventory for variant: "
+                                + request.getVariantId()
+                );
+            }
         }
 
-        inventory.setQuantity(inventory.getQuantity() - inventoryRequest.getQuantity());
-        inventory.setUpdatedDate(LocalDateTime.now());
+        List<InventoryResponse> responses = new ArrayList<>();
 
-        return inventoryMapper.toInventoryResponse(inventoryRepository.save(inventory));
+        for (InventoryRequest request : inventoryRequests) {
+
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            inventory.setReservedQuantity(
+                    inventory.getReservedQuantity() - request.getQuantity()
+            );
+
+            inventory.setUpdatedDate(LocalDateTime.now());
+
+            responses.add(inventoryMapper.toInventoryResponse(inventory));
+        }
+
+        return responses;
     }
 
     @Override
-    public List<InventoryResponse> reserveInventories(List<InventoryRequest> inventoryRequests) {
-        return List.of();
-    }
+    @Transactional
+    public List<InventoryResponse> confirmReservedInventories(List<InventoryRequest> inventoryRequests) {
 
-    @Override
-    public InventoryResponse reserveInventory(InventoryRequest inventoryRequest) {
-        return null;
-    }
+        if (inventoryRequests == null || inventoryRequests.isEmpty()) {
+            throw new BusinessException(
+                    "INVENTORY_REQUESTS_EMPTY",
+                    "At least one inventory item is required"
+            );
+        }
 
-    @Override
-    public InventoryResponse releaseReservedInventory(InventoryRequest inventoryRequest) {
-        return null;
+        Set<String> variantIds = inventoryRequests.stream()
+                .map(InventoryRequest::getVariantId)
+                .collect(Collectors.toSet());
+
+        if (variantIds.size() != inventoryRequests.size()) {
+            throw new BusinessException(
+                    "DUPLICATE_VARIANT_IDS",
+                    "Duplicate variant IDs are not allowed"
+            );
+        }
+
+        List<String> sortedVariantIds = variantIds.stream().sorted().toList();
+
+        List<Inventory> inventories = inventoryRepository.findAllByVariantIdInForUpdate(sortedVariantIds);
+
+        Map<String, Inventory> inventoryMap = inventories.stream()
+                .collect(Collectors.toMap(
+                        Inventory::getVariantId,
+                        Function.identity()
+                ));
+
+        for (InventoryRequest request : inventoryRequests) {
+
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            if (inventory == null) {
+                throw new ResourceNotFoundException(
+                        "Inventory with variant id "
+                                + request.getVariantId() + " not found"
+                );
+            }
+
+            int quantity = request.getQuantity();
+
+            if (inventory.getReservedQuantity() < quantity) {
+                throw new BusinessException(
+                        "INSUFFICIENT_RESERVED_INVENTORY",
+                        "Not enough reserved inventory for variant: "
+                                + request.getVariantId()
+                );
+            }
+        }
+
+        List<InventoryResponse> responses = new ArrayList<>();
+
+        for (InventoryRequest request : inventoryRequests) {
+
+            Inventory inventory = inventoryMap.get(request.getVariantId());
+
+            int quantity = request.getQuantity();
+
+            inventory.setQuantity(inventory.getQuantity() - quantity);
+
+            inventory.setReservedQuantity(
+                    inventory.getReservedQuantity() - quantity
+            );
+
+            inventory.setUpdatedDate(LocalDateTime.now());
+
+            responses.add(inventoryMapper.toInventoryResponse(inventory));
+        }
+
+        return responses;
     }
 }

@@ -60,22 +60,6 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Inventories updated successfully", inventories));
     }
 
-    @PatchMapping("/increase")
-    public ResponseEntity<ApiResponse<InventoryResponse>> increaseInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
-
-        InventoryResponse inventory = inventoryService.increaseInventory(inventoryRequest);
-
-        return ResponseEntity.ok(ApiResponse.success("Inventory increased successfully", inventory));
-    }
-
-    @PatchMapping("/decrease")
-    public ResponseEntity<ApiResponse<InventoryResponse>> decreaseInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
-
-        InventoryResponse inventory = inventoryService.decreaseInventory(inventoryRequest);
-
-        return ResponseEntity.ok(ApiResponse.success("Inventory decreased successfully", inventory));
-    }
-
     @PostMapping("/reservations")
     public ResponseEntity<ApiResponse<List<InventoryResponse>>> reserveInventories(@RequestBody List<@Valid InventoryRequest> inventoryRequests) {
 
@@ -84,19 +68,11 @@ public class InventoryController {
         return ResponseEntity.ok(ApiResponse.success("Inventories reserved successfully", inventories));
     }
 
-    @PostMapping("/reserve")
-    public ResponseEntity<ApiResponse<InventoryResponse>> reserveInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
-
-        InventoryResponse inventory = inventoryService.reserveInventory(inventoryRequest);
-
-        return ResponseEntity.ok(ApiResponse.success("Inventory reserved successfully", inventory));
-    }
-
     @PostMapping("/release")
-    public ResponseEntity<ApiResponse<InventoryResponse>> releaseReservedInventory(@Valid @RequestBody InventoryRequest inventoryRequest) {
+    public ResponseEntity<ApiResponse<List<InventoryResponse>>> releaseReservedInventories(@RequestBody List<@Valid InventoryRequest> inventoryRequests) {
 
-        InventoryResponse inventory = inventoryService.releaseReservedInventory(inventoryRequest);
+        List<InventoryResponse> inventories = inventoryService.releaseReservedInventories(inventoryRequests);
 
-        return ResponseEntity.ok(ApiResponse.success("Reserved inventory released successfully", inventory));
+        return ResponseEntity.ok(ApiResponse.success("Reserved inventories released successfully", inventories));
     }
 }

@@ -17,14 +17,10 @@ public interface InventoryService {
 
     List<InventoryResponse> getAll();
 
-    InventoryResponse increaseInventory(InventoryRequest inventoryRequest);
-
-    InventoryResponse decreaseInventory(InventoryRequest inventoryRequest);
-
     List<InventoryResponse> reserveInventories(List<InventoryRequest> inventoryRequests);
 
-    InventoryResponse reserveInventory(InventoryRequest inventoryRequest);
+    List<InventoryResponse> releaseReservedInventories(List<InventoryRequest> inventoryRequests);
 
-    InventoryResponse releaseReservedInventory(InventoryRequest inventoryRequest);
+    List<InventoryResponse> confirmReservedInventories(List<InventoryRequest> inventoryRequest);
 
 }

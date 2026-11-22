@@ -4,20 +4,25 @@ import com.ecommerce.order.client.ProductVariantClient;
 import com.ecommerce.order.common.response.ApiResponse;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.request.OrderRequest;
-import com.ecommerce.order.dto.response.OrderItemResponse;
 import com.ecommerce.order.dto.response.OrderResponse;
 import com.ecommerce.order.dto.response.ProductVariantClientResponse;
 import com.ecommerce.order.entity.Order;
 import com.ecommerce.order.entity.OrderItem;
+import com.ecommerce.order.entity.OutboxEvent;
 import com.ecommerce.order.enums.OrderStatus;
+import com.ecommerce.order.enums.OutboxStatus;
+import com.ecommerce.order.event.OrderCreatedEvent;
+import com.ecommerce.order.event.OrderCreatedItemEvent;
 import com.ecommerce.order.exception.BusinessException;
 import com.ecommerce.order.mapper.OrderMapper;
 import com.ecommerce.order.repository.OrderItemRepository;
 import com.ecommerce.order.repository.OrderRepository;
+import com.ecommerce.order.repository.OutboxEventRepository;
 import com.ecommerce.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,8 +38,10 @@ import java.util.stream.Collectors;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OutboxEventRepository outboxEventRepository;
     private final ProductVariantClient productVariantClient;
     private final OrderMapper orderMapper;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -65,8 +72,17 @@ public class OrderServiceImpl implements OrderService {
 
         List<ProductVariantClientResponse> variants = apiResponse.getData();
 
-        if (variants.size() != uniqueVariantIds.size()) {
-            throw new BusinessException("VARIANT_NOT_FOUND", "One or more product variants do not exist");
+        Set<String> returnedVariantIds = variants.stream()
+                .map(ProductVariantClientResponse::getVariantId)
+                .collect(Collectors.toSet());
+
+        if (returnedVariantIds.size() != variants.size()
+                || !returnedVariantIds.equals(uniqueVariantIds)) {
+
+            throw new BusinessException(
+                    "VARIANT_NOT_FOUND",
+                    "One or more product variants do not exist"
+            );
         }
 
         Map<String, ProductVariantClientResponse> variantMap =
@@ -113,6 +129,10 @@ public class OrderServiceImpl implements OrderService {
         orderItems.forEach(item -> item.setOrder(savedOrder));
 
         List<OrderItem> savedItems = orderItemRepository.saveAll(orderItems);
+
+        OutboxEvent outboxEvent = buildOutboxEvent(savedOrder, savedItems);
+
+        outboxEventRepository.save(outboxEvent);
 
         return orderMapper.toResponse(savedOrder, savedItems);
     }
@@ -165,5 +185,41 @@ public class OrderServiceImpl implements OrderService {
                         .toString()
                         .substring(0, 8)
                         .toUpperCase();
+    }
+
+    private OutboxEvent buildOutboxEvent(Order savedOrder, List<OrderItem> orderItems) {
+
+        OrderCreatedEvent event = OrderCreatedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .orderId(savedOrder.getId())
+                .orderNumber(savedOrder.getOrderNumber())
+                .createdAt(LocalDateTime.now())
+                .items(orderItems.stream()
+                        .map(item -> OrderCreatedItemEvent.builder()
+                                .variantId(item.getVariantId())
+                                .quantity(item.getQuantity())
+                                .build())
+                        .toList())
+                .build();
+
+        String payload;
+
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (Exception exception) {
+            throw new BusinessException("EVENT_SERIALIZATION_FAILED", "Unable to serialize order created event");
+        }
+
+        return OutboxEvent.builder()
+                .id(event.getEventId())
+                .topic("order-events")
+                .aggregateType("ORDER")
+                .aggregateId(savedOrder.getId())
+                .eventType("ORDER_CREATED")
+                .payload(payload)
+                .status(OutboxStatus.NEW)
+                .retryCount(0)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 }

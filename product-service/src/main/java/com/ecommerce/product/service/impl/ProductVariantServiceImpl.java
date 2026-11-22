@@ -6,6 +6,7 @@ import com.ecommerce.product.dto.response.ProductVariantResponse;
 import com.ecommerce.product.entity.OutboxEvent;
 import com.ecommerce.product.entity.Product;
 import com.ecommerce.product.entity.ProductVariant;
+import com.ecommerce.product.enums.OutboxStatus;
 import com.ecommerce.product.event.ProductVariantCreatedEvent;
 import com.ecommerce.product.exception.BusinessException;
 import com.ecommerce.product.exception.ResourceNotFoundException;
@@ -157,7 +158,7 @@ public class ProductVariantServiceImpl implements ProductVariantService {
                     .aggregateId(variant.getId())
                     .eventType("PRODUCT_VARIANT_CREATED")
                     .payload(objectMapper.writeValueAsString(event))
-                    .status(OutboxEvent.OutboxStatus.NEW)
+                    .status(OutboxStatus.NEW)
                     .retryCount(0)
                     .createdAt(LocalDateTime.now())
                     .build();

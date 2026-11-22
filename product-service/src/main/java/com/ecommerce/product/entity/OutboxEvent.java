@@ -1,5 +1,6 @@
 package com.ecommerce.product.entity;
 
+import com.ecommerce.product.enums.OutboxStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -57,12 +58,4 @@ public class OutboxEvent {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
     private LocalDateTime publishedAt;
-
-    public enum OutboxStatus {
-        NEW,
-        PROCESSING,
-        SENT,
-        FAILED,
-        DEAD_LETTER
-    }
 }

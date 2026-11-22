@@ -2,6 +2,7 @@ package com.ecommerce.product.service.impl;
 
 import com.ecommerce.product.dto.response.OutboxEventResponse;
 import com.ecommerce.product.entity.OutboxEvent;
+import com.ecommerce.product.enums.OutboxStatus;
 import com.ecommerce.product.exception.ResourceNotFoundException;
 import com.ecommerce.product.mapper.OutboxEventMapper;
 import com.ecommerce.product.repository.OutboxEventRepository;
@@ -51,7 +52,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
         List<OutboxEvent> events = outboxEventRepository.findPendingEventsForUpdate(limit);
 
         for (OutboxEvent event : events) {
-            event.setStatus(OutboxEvent.OutboxStatus.PROCESSING);
+            event.setStatus(OutboxStatus.PROCESSING);
         }
 
         return events;
@@ -62,7 +63,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     public void markAsSent(String eventId) {
         OutboxEvent event = getEventOrThrow(eventId);
 
-        event.setStatus(OutboxEvent.OutboxStatus.SENT);
+        event.setStatus(OutboxStatus.SENT);
         event.setPublishedAt(LocalDateTime.now());
         event.setErrorMessage(null);
     }
@@ -77,9 +78,9 @@ public class OutboxEventServiceImpl implements OutboxEventService {
         event.setErrorMessage(errorMessage);
 
         if (retryCount >= maxAttempts) {
-            event.setStatus(OutboxEvent.OutboxStatus.FAILED);
+            event.setStatus(OutboxStatus.FAILED);
         } else {
-            event.setStatus(OutboxEvent.OutboxStatus.NEW);
+            event.setStatus(OutboxStatus.NEW);
         }
     }
 
@@ -88,7 +89,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     public void markAsDeadLettered(String eventId, String errorMessage) {
         OutboxEvent event = getEventOrThrow(eventId);
 
-        event.setStatus(OutboxEvent.OutboxStatus.DEAD_LETTER);
+        event.setStatus(OutboxStatus.DEAD_LETTER);
         event.setErrorMessage(errorMessage);
     }
 
