@@ -67,6 +67,11 @@ public class Order {
     @Column(columnDefinition = "TEXT")
     private String customerNote;
 
+    @Column(length = 500)
+    private String cancellationReason;
+
+    private LocalDateTime cancelledAt;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

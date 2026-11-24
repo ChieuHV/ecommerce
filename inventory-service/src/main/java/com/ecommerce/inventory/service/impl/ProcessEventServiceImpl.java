@@ -4,6 +4,8 @@ import com.ecommerce.inventory.dto.request.InventoryRequest;
 import com.ecommerce.inventory.dto.request.ProcessEventRequest;
 import com.ecommerce.inventory.dto.response.ProcessEventResponse;
 import com.ecommerce.inventory.entity.ProcessedEvent;
+import com.ecommerce.inventory.event.OrderCreatedEvent;
+import com.ecommerce.inventory.event.OrderCreatedItemEvent;
 import com.ecommerce.inventory.event.ProductVariantCreatedEvent;
 import com.ecommerce.inventory.exception.BusinessException;
 import com.ecommerce.inventory.mapper.ProcessEventMapper;
@@ -13,6 +15,9 @@ import com.ecommerce.inventory.service.ProcessEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -39,16 +44,16 @@ public class ProcessEventServiceImpl implements ProcessEventService {
             return;
         }
 
+        if (event.getEventId() == null || event.getEventId().isBlank()) {
+            throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
+        }
+
         if (event.getVariantId() == null || event.getVariantId().isBlank()) {
             throw new BusinessException("VARIANT_ID_REQUIRED", "Variant ID is required");
         }
 
         if (event.getQuantity() == null || event.getQuantity() < 0) {
             throw new BusinessException("INVALID_INITIAL_QUANTITY", "Invalid initial quantity");
-        }
-
-        if (event.getEventId() == null || event.getEventId().isBlank()) {
-            throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
         }
 
         InventoryRequest inventoryRequest = InventoryRequest.builder()
@@ -60,7 +65,57 @@ public class ProcessEventServiceImpl implements ProcessEventService {
 
         ProcessEventRequest processEventRequest = ProcessEventRequest.builder()
                 .eventId(event.getEventId())
-                .variantId(event.getVariantId())
+                .eventType("STOCK_IMPORTED")
+                .build();
+
+        ProcessedEvent processedEvent = processEventMapper.toEntity(processEventRequest);
+
+        processEventRepository.save(processedEvent);
+    }
+
+    @Override
+    @Transactional
+    public void processOrderCreatedEvent(OrderCreatedEvent event) {
+        if (processEventRepository.existsById(event.getEventId())) {
+            return;
+        }
+
+        if (event.getEventId() == null || event.getEventId().isBlank()) {
+            throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
+        }
+
+        if (event.getOrderId() == null || event.getOrderId().isBlank()) {
+            throw new BusinessException("ORDER_ID_REQUIRED", "Order ID is required");
+        }
+
+        if (event.getItems() == null || event.getItems().isEmpty()) {
+            throw new BusinessException("ORDER_ITEM_REQUIRED", "Order Item is required");
+        }
+
+        List<InventoryRequest> inventoryRequests = new ArrayList<>();
+
+        for (OrderCreatedItemEvent orderItem : event.getItems()) {
+            if (orderItem.getVariantId() == null || orderItem.getVariantId().isBlank()) {
+                throw new BusinessException("VARIANT_ID_REQUIRED", "Variant ID is required");
+            }
+
+            if (orderItem.getQuantity() == null || orderItem.getQuantity() < 0) {
+                throw new BusinessException("INVALID_INITIAL_QUANTITY", "Invalid initial quantity");
+            }
+
+            InventoryRequest inventoryRequest = InventoryRequest.builder()
+                    .variantId(orderItem.getVariantId())
+                    .quantity(orderItem.getQuantity())
+                    .build();
+
+            inventoryRequests.add(inventoryRequest);
+        }
+
+        inventoryService.reserveInventories(inventoryRequests);
+
+        ProcessEventRequest processEventRequest = ProcessEventRequest.builder()
+                .eventId(event.getEventId())
+                .eventType("ORDER_CREATED")
                 .build();
 
         ProcessedEvent processedEvent = processEventMapper.toEntity(processEventRequest);

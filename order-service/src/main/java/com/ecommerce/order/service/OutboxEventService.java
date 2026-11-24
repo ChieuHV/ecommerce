@@ -6,11 +6,10 @@ import com.ecommerce.order.entity.OutboxEvent;
 import java.util.List;
 
 public interface OutboxEventService {
-    OutboxEventResponse save(OutboxEvent outboxEvent);
-
-    List<OutboxEventResponse> save(List<OutboxEvent> outboxEvents);
 
     List<OutboxEventResponse> getAll();
+
+    OutboxEvent getById(String id);
 
     List<OutboxEvent> claimPendingEvents(int limit);
 

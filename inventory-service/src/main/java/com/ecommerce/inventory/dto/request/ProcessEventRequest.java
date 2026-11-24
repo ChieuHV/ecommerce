@@ -13,6 +13,6 @@ public class ProcessEventRequest {
     @NotBlank(message = "Event ID is required")
     private String eventId;
 
-    @NotBlank(message = "Variant ID is required")
-    private String variantId;
+    @NotBlank(message = "Event type is required")
+    private String eventType;
 }

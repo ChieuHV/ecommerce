@@ -16,7 +16,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/inventories")
 @RequiredArgsConstructor
-@Validated
 public class InventoryController {
 
     private final InventoryService inventoryService;

@@ -19,7 +19,7 @@ public class ProcessedEvent {
     private String eventId;
 
     @Column(nullable = false, length = 100)
-    private String variantId;
+    private String eventType;
 
     @Column(nullable = false)
     private LocalDateTime processedAt;

@@ -25,25 +25,19 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     private int maxAttempts;
 
     @Override
-    public OutboxEventResponse save(OutboxEvent outboxEvent) {
-        OutboxEvent savedOutboxEvent = outboxEventRepository.save(outboxEvent);
-
-        return outboxEventMapper.toResponse(savedOutboxEvent);
-    }
-
-    @Override
-    public List<OutboxEventResponse> save(List<OutboxEvent> outboxEvents) {
-        List<OutboxEvent> savedOutboxEvents = outboxEventRepository.saveAll(outboxEvents);
-
-        return savedOutboxEvents.stream().map(outboxEventMapper::toResponse).toList();
-    }
-
-    @Override
     public List<OutboxEventResponse> getAll() {
         return outboxEventRepository.findAll()
                 .stream()
                 .map(outboxEventMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public OutboxEvent getById(String id) {
+        return outboxEventRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Outbox event not found: " + id
+                ));
     }
 
     @Override
@@ -61,7 +55,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     @Override
     @Transactional
     public void markAsSent(String eventId) {
-        OutboxEvent event = getEventOrThrow(eventId);
+        OutboxEvent event = getById(eventId);
 
         event.setStatus(OutboxStatus.SENT);
         event.setPublishedAt(LocalDateTime.now());
@@ -71,7 +65,7 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     @Override
     @Transactional
     public void markForRetry(String eventId, String errorMessage) {
-        OutboxEvent event = getEventOrThrow(eventId);
+        OutboxEvent event = getById(eventId);
 
         int retryCount = event.getRetryCount() + 1;
         event.setRetryCount(retryCount);
@@ -87,16 +81,9 @@ public class OutboxEventServiceImpl implements OutboxEventService {
     @Override
     @Transactional
     public void markAsDeadLettered(String eventId, String errorMessage) {
-        OutboxEvent event = getEventOrThrow(eventId);
+        OutboxEvent event = getById(eventId);
 
         event.setStatus(OutboxStatus.DEAD_LETTER);
         event.setErrorMessage(errorMessage);
-    }
-
-    private OutboxEvent getEventOrThrow(String eventId) {
-        return outboxEventRepository.findById(eventId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Outbox event not found: " + eventId
-                ));
     }
 }

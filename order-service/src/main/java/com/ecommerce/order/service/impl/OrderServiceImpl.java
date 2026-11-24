@@ -2,6 +2,7 @@ package com.ecommerce.order.service.impl;
 
 import com.ecommerce.order.client.ProductVariantClient;
 import com.ecommerce.order.common.response.ApiResponse;
+import com.ecommerce.order.dto.request.CancelOrderRequest;
 import com.ecommerce.order.dto.request.OrderItemRequest;
 import com.ecommerce.order.dto.request.OrderRequest;
 import com.ecommerce.order.dto.response.OrderResponse;
@@ -11,9 +12,12 @@ import com.ecommerce.order.entity.OrderItem;
 import com.ecommerce.order.entity.OutboxEvent;
 import com.ecommerce.order.enums.OrderStatus;
 import com.ecommerce.order.enums.OutboxStatus;
+import com.ecommerce.order.event.OrderCancelledEvent;
+import com.ecommerce.order.event.OrderCancelledItemEvent;
 import com.ecommerce.order.event.OrderCreatedEvent;
 import com.ecommerce.order.event.OrderCreatedItemEvent;
 import com.ecommerce.order.exception.BusinessException;
+import com.ecommerce.order.exception.ResourceNotFoundException;
 import com.ecommerce.order.mapper.OrderMapper;
 import com.ecommerce.order.repository.OrderItemRepository;
 import com.ecommerce.order.repository.OrderRepository;
@@ -137,6 +141,50 @@ public class OrderServiceImpl implements OrderService {
         return orderMapper.toResponse(savedOrder, savedItems);
     }
 
+    @Override
+    @Transactional
+    public Order updateStatus(String orderId, OrderStatus orderStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order with id " + orderId + " not found"));
+
+        order.setStatus(orderStatus);
+
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse cancelOrder(String orderId, CancelOrderRequest request) {
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Order with id " + orderId + " not found"
+                ));
+
+        if (!order.getStatus().canBeCancelled()) {
+            throw new BusinessException(
+                    "ORDER_CANNOT_BE_CANCELLED",
+                    "Order cannot be cancelled in current status: " + order.getStatus()
+            );
+        }
+
+        List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
+
+        LocalDateTime cancelledAt = LocalDateTime.now();
+
+        order.setStatus(OrderStatus.CANCELLED);
+        order.setCancellationReason(request.getReason().trim());
+        order.setCancelledAt(cancelledAt);
+
+        orderRepository.save(order);
+
+        OutboxEvent outboxEvent = buildOrderCancelledEvent(order, orderItems);
+
+        outboxEventRepository.save(outboxEvent);
+
+        return orderMapper.toResponse(order, orderItems);
+    }
+
     private Order buildOrder(OrderRequest orderRequest, BigDecimal subtotal) {
 
         BigDecimal shippingFee = BigDecimal.ZERO;
@@ -212,10 +260,50 @@ public class OrderServiceImpl implements OrderService {
 
         return OutboxEvent.builder()
                 .id(event.getEventId())
-                .topic("order-events")
+                .topic("order-created")
                 .aggregateType("ORDER")
                 .aggregateId(savedOrder.getId())
                 .eventType("ORDER_CREATED")
+                .payload(payload)
+                .status(OutboxStatus.NEW)
+                .retryCount(0)
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private OutboxEvent buildOrderCancelledEvent(Order order, List<OrderItem> orderItems) {
+
+        OrderCancelledEvent event = OrderCancelledEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .reason(order.getCancellationReason())
+                .cancelledAt(order.getCancelledAt())
+                .items(orderItems.stream()
+                        .map(item -> OrderCancelledItemEvent.builder()
+                                .variantId(item.getVariantId())
+                                .quantity(item.getQuantity())
+                                .build())
+                        .toList())
+                .build();
+
+        String payload;
+
+        try {
+            payload = objectMapper.writeValueAsString(event);
+        } catch (Exception exception) {
+            throw new BusinessException(
+                    "EVENT_SERIALIZATION_FAILED",
+                    "Unable to serialize order cancelled event"
+            );
+        }
+
+        return OutboxEvent.builder()
+                .id(event.getEventId())
+                .topic("order-cancelled")
+                .aggregateType("ORDER")
+                .aggregateId(order.getId())
+                .eventType("ORDER_CANCELLED")
                 .payload(payload)
                 .status(OutboxStatus.NEW)
                 .retryCount(0)

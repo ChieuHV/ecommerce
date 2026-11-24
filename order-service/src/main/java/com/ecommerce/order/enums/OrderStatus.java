@@ -8,5 +8,11 @@ public enum OrderStatus {
     DELIVERED,
     CANCELLED,
     RETURNED,
-    FAILED
+    FAILED;
+
+    public boolean canBeCancelled() {
+        return this == PENDING
+                || this == CONFIRMED
+                || this == PROCESSING;
+    }
 }

@@ -73,20 +73,11 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConsumerFactory<String, String> manualConsumerFactory() {
-        return new DefaultKafkaConsumerFactory<>(
-                baseProps(),
-                new StringDeserializer(),
-                new StringDeserializer()
-        );
-    }
-
-    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> manualKafkaListenerContainerFactory(
-            ConsumerFactory<String, String> manualConsumerFactory) {
+            ConsumerFactory<String, String> consumerFactory) {
 
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(manualConsumerFactory);
+        factory.setConsumerFactory(consumerFactory);
 
         return factory;
     }

@@ -34,6 +34,8 @@ public class OrderMapper {
                 .country(order.getCountry())
                 .postalCode(order.getPostalCode())
                 .customerNote(order.getCustomerNote())
+                .cancellationReason(order.getCancellationReason())
+                .cancelledAt(order.getCancelledAt())
                 .status(order.getStatus())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())

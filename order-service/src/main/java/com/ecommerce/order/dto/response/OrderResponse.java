@@ -47,6 +47,10 @@ public class OrderResponse {
 
     private String customerNote;
 
+    private String cancellationReason;
+
+    private LocalDateTime cancelledAt;
+
     private OrderStatus status;
 
     private LocalDateTime createdAt;
