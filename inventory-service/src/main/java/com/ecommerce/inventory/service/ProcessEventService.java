@@ -2,6 +2,7 @@ package com.ecommerce.inventory.service;
 
 import com.ecommerce.inventory.dto.request.ProcessEventRequest;
 import com.ecommerce.inventory.dto.response.ProcessEventResponse;
+import com.ecommerce.inventory.event.OrderCancelledEvent;
 import com.ecommerce.inventory.event.OrderCreatedEvent;
 import com.ecommerce.inventory.event.ProductVariantCreatedEvent;
 
@@ -12,4 +13,6 @@ public interface ProcessEventService {
     void processProductVariantCreatedEvent(ProductVariantCreatedEvent event);
 
     void processOrderCreatedEvent(OrderCreatedEvent event);
+
+    void processOrderCancelledEvent(OrderCancelledEvent event);
 }

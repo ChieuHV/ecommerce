@@ -49,7 +49,7 @@ public class OrderCreatedDltConsumer {
             );
 
             log.info(
-                    "Published ProductCreationFailedEvent: eventId={}, variantId={}",
+                    "Published OrderCreationFailedEvent: eventId={}, variantId={}",
                     failedEvent.getEventId(),
                     failedEvent.getOrderId()
             );
