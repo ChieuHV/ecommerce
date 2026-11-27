@@ -47,9 +47,6 @@ public class ProcessEventServiceImpl implements ProcessEventService {
     @Override
     @Transactional
     public void processProductVariantCreatedEvent(ProductVariantCreatedEvent event) {
-        if (processEventRepository.existsById(event.getEventId())) {
-            return;
-        }
 
         if (event.getEventId() == null || event.getEventId().isBlank()) {
             throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
@@ -61,6 +58,10 @@ public class ProcessEventServiceImpl implements ProcessEventService {
 
         if (event.getQuantity() == null || event.getQuantity() < 0) {
             throw new BusinessException("INVALID_INITIAL_QUANTITY", "Invalid initial quantity");
+        }
+
+        if (processEventRepository.existsById(event.getEventId())) {
+            return;
         }
 
         InventoryRequest inventoryRequest = InventoryRequest.builder()
@@ -83,9 +84,6 @@ public class ProcessEventServiceImpl implements ProcessEventService {
     @Override
     @Transactional
     public void processOrderCreatedEvent(OrderCreatedEvent event) {
-        if (processEventRepository.existsById(event.getEventId())) {
-            return;
-        }
 
         if (event.getEventId() == null || event.getEventId().isBlank()) {
             throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
@@ -97,6 +95,10 @@ public class ProcessEventServiceImpl implements ProcessEventService {
 
         if (event.getItems() == null || event.getItems().isEmpty()) {
             throw new BusinessException("ORDER_ITEM_REQUIRED", "Order Item is required");
+        }
+
+        if (processEventRepository.existsById(event.getEventId())) {
+            return;
         }
 
         List<InventoryRequest> inventoryRequests = new ArrayList<>();
@@ -136,9 +138,6 @@ public class ProcessEventServiceImpl implements ProcessEventService {
 
     @Override
     public void processOrderCancelledEvent(OrderCancelledEvent event) {
-        if (processEventRepository.existsById(event.getEventId())) {
-            return;
-        }
 
         if (event.getEventId() == null || event.getEventId().isBlank()) {
             throw new BusinessException("EVENT_ID_REQUIRED", "Event ID is required");
@@ -150,6 +149,10 @@ public class ProcessEventServiceImpl implements ProcessEventService {
 
         if (event.getItems() == null || event.getItems().isEmpty()) {
             throw new BusinessException("ORDER_ITEM_REQUIRED", "Order Item is required");
+        }
+
+        if (processEventRepository.existsById(event.getEventId())) {
+            return;
         }
 
         List<InventoryRequest> inventoryRequests = new ArrayList<>();

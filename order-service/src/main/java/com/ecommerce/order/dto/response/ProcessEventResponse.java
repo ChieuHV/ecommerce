@@ -1,0 +1,21 @@
+package com.ecommerce.order.dto.response;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProcessEventResponse {
+
+    private String eventId;
+
+    private String eventType;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime processedAt;
+}

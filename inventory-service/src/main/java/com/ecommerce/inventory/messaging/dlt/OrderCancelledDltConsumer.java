@@ -3,7 +3,7 @@ package com.ecommerce.inventory.messaging.dlt;
 import com.ecommerce.inventory.event.OrderCancellationFailedEvent;
 import com.ecommerce.inventory.event.OrderCancelledEvent;
 import com.ecommerce.inventory.messaging.publisher.OrderCancellationFailedPublisher;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

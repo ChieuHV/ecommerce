@@ -148,6 +148,7 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order with id " + orderId + " not found"));
 
         order.setStatus(orderStatus);
+        order.setUpdatedAt(LocalDateTime.now(ZoneId.systemDefault()));
 
         return orderRepository.save(order);
     }
@@ -170,7 +171,7 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> orderItems = orderItemRepository.findByOrderId(orderId);
 
-        LocalDateTime cancelledAt = LocalDateTime.now();
+        LocalDateTime cancelledAt = LocalDateTime.now(ZoneId.systemDefault());
 
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancellationReason(request.getReason().trim());
@@ -227,7 +228,7 @@ public class OrderServiceImpl implements OrderService {
 
     private String generateOrderNumber() {
         return "ORD-" +
-                LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) +
+                LocalDate.now(ZoneId.systemDefault()).format(DateTimeFormatter.BASIC_ISO_DATE) +
                 "-" +
                 UUID.randomUUID()
                         .toString()
@@ -241,7 +242,7 @@ public class OrderServiceImpl implements OrderService {
                 .eventId(UUID.randomUUID().toString())
                 .orderId(savedOrder.getId())
                 .orderNumber(savedOrder.getOrderNumber())
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.systemDefault()))
                 .items(orderItems.stream()
                         .map(item -> OrderCreatedItemEvent.builder()
                                 .variantId(item.getVariantId())
@@ -267,7 +268,7 @@ public class OrderServiceImpl implements OrderService {
                 .payload(payload)
                 .status(OutboxStatus.NEW)
                 .retryCount(0)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.systemDefault()))
                 .build();
     }
 
@@ -307,7 +308,7 @@ public class OrderServiceImpl implements OrderService {
                 .payload(payload)
                 .status(OutboxStatus.NEW)
                 .retryCount(0)
-                .createdAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now(ZoneId.systemDefault()))
                 .build();
     }
 }

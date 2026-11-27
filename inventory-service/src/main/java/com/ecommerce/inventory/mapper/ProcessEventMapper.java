@@ -13,7 +13,7 @@ public class ProcessEventMapper {
     public ProcessedEvent toEntity(ProcessEventRequest request) {
         return ProcessedEvent.builder()
                 .eventId(request.getEventId())
-                .variantId(request.getVariantId())
+                .eventType(request.getEventType())
                 .processedAt(LocalDateTime.now())
                 .build();
     }
@@ -21,7 +21,7 @@ public class ProcessEventMapper {
     public ProcessEventResponse toProcessEventResponse(ProcessedEvent processedEvent) {
         return ProcessEventResponse.builder()
                 .eventId(processedEvent.getEventId())
-                .variantId(processedEvent.getVariantId())
+                .eventType(processedEvent.getEventType())
                 .processedAt(processedEvent.getProcessedAt())
                 .build();
     }

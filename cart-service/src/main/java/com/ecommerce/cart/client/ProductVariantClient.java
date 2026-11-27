@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "product-service", url = "${services.product-variants.url}")
+@FeignClient(name = "product-service", url = "${services.product.url}")
 public interface ProductVariantClient {
     @PostMapping("/by-ids")
     ApiResponse<List<ProductVariantClientResponse>> getVariantsByIds(@RequestBody List<String> ids);

@@ -14,7 +14,7 @@ public class ProcessEventResponse {
 
     private String eventId;
 
-    private String variantId;
+    private String eventType;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime processedAt;

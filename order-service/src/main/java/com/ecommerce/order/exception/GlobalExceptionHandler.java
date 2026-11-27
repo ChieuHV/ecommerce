@@ -1,8 +1,6 @@
 package com.ecommerce.order.exception;
 
-import com.ecommerce.product.common.response.ErrorResponse;
-import com.ecommerce.product.exception.BusinessException;
-import com.ecommerce.product.exception.ResourceNotFoundException;
+import com.ecommerce.order.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
